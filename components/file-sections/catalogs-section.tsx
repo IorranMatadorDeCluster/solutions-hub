@@ -28,31 +28,40 @@ export default function CatalogsSection() {
   const [editingCatalog, setEditingCatalog] = useState<CatalogFile | null>(null)
   const [newName, setNewName] = useState("")
   const [dragActive, setDragActive] = useState(false)
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
     loadCatalogs()
   }, [])
 
 const loadCatalogs = async () => {
-  setLoading(true)
+  setLoading(true);
   try {
-    const response = await fetch("/api/files/catalogs")
-    if (response.ok) {
-      const { data } = await response.json()
-      console.log("Fetched catalogs data:", data)
-      // Access data directly since that's what the API returns
-      setCatalogs(data || [])
+    console.log('Fetching catalogs...'); // Debug log
+    const response = await fetch("/api/files/catalogs");
+    
+    if (!response.ok) {
+      console.error('Response not OK:', response.status, response.statusText);
+      throw new Error('Failed to fetch catalogs');
+    }
+    
+    const data = await response.json();
+    console.log("Fetched catalogs data:", data); // Debug log
+    
+    if (data.success && Array.isArray(data.data)) {
+      setCatalogs(data.data);
     } else {
-      console.error("Error loading catalogs:", response.statusText)
-      setCatalogs([])
+      console.error('Invalid data format:', data);
+      setCatalogs([]);
     }
   } catch (error) {
-    console.error("Error loading catalogs:", error)
-    setCatalogs([])
+    console.error("Error loading catalogs:", error);
+    setCatalogs([]);
   } finally {
-    setLoading(false)
+    setLoading(false);
   }
-}
+};
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault()
@@ -97,71 +106,132 @@ const loadCatalogs = async () => {
     }
   }
 
-  const handleUpload = async () => {
-    if (!selectedFile || !fileName.trim()) return
+const handleUpload = async () => {
+  if (!selectedFile || !fileName.trim()) return;
 
-    setUploading(true)
-    try {
-      const formData = new FormData()
-      formData.append("file", selectedFile)
-      formData.append("fileName", fileName.trim())
-
-      const response = await fetch("/api/files/catalogs/upload", {
-        method: "POST",
-        body: formData,
-      })
-
-      if (response.ok) {
-        await loadCatalogs()
-        setSelectedFile(null)
-        setFileName("")
-      }
-    } catch (error) {
-      console.error("Error uploading catalog:", error)
-    } finally {
-      setUploading(false)
-    }
-  }
-
-const handleDelete = async (catalogName: string) => {
+  setUploading(true);
   try {
-    const response = await fetch(`/api/files/catalogs/${encodeURIComponent(catalogName)}`, {
-      method: "DELETE",
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    formData.append('fileName', fileName.trim());
+    formData.append('fileType', selectedFile.type);
+
+
+    const response = await fetch('/api/files/catalogs/upload', {
+      method: 'POST',
+      body: formData,
     });
 
-    if (response.ok) {
-      await loadCatalogs(); // Refresh the list
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to upload catalog');
     }
-  } catch (error) {
-    console.error("Error deleting catalog:", error);
+
+    // Reset form and refresh catalog list
+    setSelectedFile(null);
+    setFileName('');
+    await loadCatalogs();
+  } catch (error: any) {
+    console.error('Error uploading catalog:', error);
+    alert(error.message || 'Failed to upload catalog');
+  } finally {
+    setUploading(false);
   }
 };
 
+// Update the handleDelete function
+const handleDelete = async (catalogName: string) => {
+  try {
+    // Remove file extension if present
+    const nameWithoutExtension = catalogName.split('.').slice(0, -1).join('.');
+    const extension = catalogName.split('.').pop();
+    
+    // Properly encode the catalog name for the URL
+    const encodedName = encodeURIComponent(catalogName);
+    console.log('Deleting catalog:', { 
+      original: catalogName,
+      encoded: encodedName 
+    });
+
+    const response = await fetch(`/api/files/catalogs/${encodedName}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to delete catalog');
+    }
+
+    // Refresh the catalog list after successful deletion
+    await loadCatalogs();
+  } catch (error: any) {
+    console.error('Error deleting catalog:', error);
+    alert(error.message || 'Failed to delete catalog');
+  }
+};
+
+// Update the handleRename function
 const handleRename = async () => {
   if (!editingCatalog || !newName.trim()) return;
 
+  setIsRenaming(true);
   try {
-    const response = await fetch(
-      `/api/files/catalogs/${encodeURIComponent(editingCatalog.name)}`,
-      {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ newName: newName.trim() }),
-      }
-    );
+    const url = `/api/files/catalogs/${encodeURIComponent(editingCatalog.name)}`;
+    console.log('Sending rename request:', {
+      oldName: editingCatalog.name,
+      newName: newName.trim()
+    });
+
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ newName: newName.trim() }),
+    });
+
+    const data = await response.json();
+    console.log('Rename response:', data);
 
     if (!response.ok) {
-      throw new Error(`Error: ${response.statusText}`);
+      throw new Error(data.message || 'Failed to rename catalog');
     }
 
-    await loadCatalogs(); // Refresh the list
+    // Force reload catalogs after successful rename
+    await loadCatalogs();
+    setDialogOpen(false);
     setEditingCatalog(null);
     setNewName("");
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error renaming catalog:", error);
-    // You might want to show an error message to the user here
+    alert(error.message || 'Failed to rename catalog');
+  } finally {
+    setIsRenaming(false);
+  }
+};
+
+const handleDownload = async (catalog: CatalogFile) => {
+  try {
+    const response = await fetch(catalog.url);
+    if (!response.ok) throw new Error('Download failed');
+
+    const blob = await response.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = catalog.name; // This will preserve the file name
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
+  } catch (error) {
+    console.error('Error downloading file:', error);
+    alert('Failed to download file');
   }
 };
 
@@ -249,20 +319,30 @@ const handleRename = async () => {
               <p className="text-xs text-slate-500 mb-4">{(catalog.size / 1024 / 1024).toFixed(2)} MB</p>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" className="flex-1" asChild>
-                  <a href={catalog.url} target="_blank" rel="noopener noreferrer">
+                  <a 
+                    href={catalog.url} 
+                    download={catalog.name}
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleDownload(catalog);
+                    }}
+                  >
                     <Download className="h-3 w-3" />
                   </a>
                 </Button>
 
-                <Dialog>
+                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                   <DialogTrigger asChild>
                     <Button
                       variant="outline"
                       size="sm"
                       className="flex-1"
                       onClick={() => {
-                        setEditingCatalog(catalog)
-                        setNewName(catalog.name.split(".")[0])
+                        setEditingCatalog(catalog);
+                        setNewName(catalog.name.split(".")[0]);
+                        setDialogOpen(true);
                       }}
                     >
                       <Edit3 className="h-3 w-3" />
@@ -282,13 +362,16 @@ const handleRename = async () => {
                           placeholder="Digite o novo nome"
                         />
                       </div>
-                      <Button onClick={handleRename} className="w-full">
-                        Renomear
+                      <Button
+                        onClick={handleRename}
+                        className="w-full"
+                        disabled={isRenaming || !newName.trim()}
+                      >
+                        {isRenaming ? "Renomeando..." : "Renomear"}
                       </Button>
                     </div>
                   </DialogContent>
                 </Dialog>
-
                 <Button
                   variant="outline"
                   size="sm"

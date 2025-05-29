@@ -16,7 +16,9 @@ interface ImageFile {
   url: string
   size: number
   lastModified: string
+  type: string
 }
+
 
 export default function ImagesSection() {
   const [images, setImages] = useState<ImageFile[]>([])
@@ -36,9 +38,12 @@ export default function ImagesSection() {
     setLoading(true)
     try {
       const response = await fetch("/api/files/images")
-      if (response.ok) {
-        const data = await response.json()
-        setImages(data.files)
+      if (!response.ok) {
+        throw new Error('Failed to fetch images')
+      }
+      const data = await response.json()
+      if (data.success && Array.isArray(data.data)) {
+        setImages(data.data)
       }
     } catch (error) {
       console.error("Error loading images:", error)
@@ -87,39 +92,52 @@ export default function ImagesSection() {
       const formData = new FormData()
       formData.append("file", selectedFile)
       formData.append("fileName", fileName.trim())
+      formData.append("fileType", selectedFile.type)
 
       const response = await fetch("/api/files/images/upload", {
         method: "POST",
         body: formData,
       })
 
-      if (response.ok) {
-        await loadImages()
-        setSelectedFile(null)
-        setFileName("")
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to upload image')
       }
-    } catch (error) {
+
+      await loadImages()
+      setSelectedFile(null)
+      setFileName("")
+    } catch (error: any) {
       console.error("Error uploading image:", error)
+      alert(error.message || 'Failed to upload image')
     } finally {
       setUploading(false)
     }
   }
 
   const handleDelete = async (imageName: string) => {
+    if (!confirm('Are you sure you want to delete this image?')) return
+
     try {
       const response = await fetch(`/api/files/images/${encodeURIComponent(imageName)}`, {
         method: "DELETE",
       })
 
-      if (response.ok) {
-        await loadImages()
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to delete image')
       }
-    } catch (error) {
+
+      await loadImages()
+    } catch (error: any) {
       console.error("Error deleting image:", error)
+      alert(error.message || 'Failed to delete image')
     }
   }
 
-  const handleRename = async () => {
+const handleRename = async () => {
     if (!editingImage || !newName.trim()) return
 
     try {
@@ -131,13 +149,18 @@ export default function ImagesSection() {
         body: JSON.stringify({ newName: newName.trim() }),
       })
 
-      if (response.ok) {
-        await loadImages()
-        setEditingImage(null)
-        setNewName("")
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to rename image')
       }
-    } catch (error) {
+
+      await loadImages()
+      setEditingImage(null)
+      setNewName("")
+    } catch (error: any) {
       console.error("Error renaming image:", error)
+      alert(error.message || 'Failed to rename image')
     }
   }
 

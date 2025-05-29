@@ -1,4 +1,4 @@
-import { listCatalogsWithPresignedUrls, deleteCatalog, renameCatalog } from '../repositories/catalogRepository';
+import { listCatalogsWithPresignedUrls, deleteCatalog, renameCatalog, createCatalog } from '../repositories/catalogRepository';
 
 export async function getCatalogs() {
   try {
@@ -19,16 +19,21 @@ export async function removeCatalog(name: string) {
   }
 }
 
-export async function updateCatalogName(oldName: string, newName: string): Promise<string> {
+export async function postCatalog(name: string, fileBuffer: Buffer, fileType: string) {
   try {
-    // Keep the original file extension
-    const extension = oldName.split('.').pop();
-    const newNameWithExtension = newName.endsWith(`.${extension}`) 
-      ? newName 
-      : `${newName}.${extension}`;
+    await createCatalog(name, fileBuffer, fileType);
+  } catch (error) {
+    console.error('Error in postCatalog service:', error);
+    throw error;
+  }
+}
 
-    await renameCatalog(oldName, newNameWithExtension);
-    return newNameWithExtension;
+export async function updateCatalogName(oldName: string, newName: string): Promise<string> {
+  try {   
+    const extension = oldName.split('.').pop();
+
+    await renameCatalog(oldName, newName);
+    return newName;
   } catch (error) {
     console.error('Error in updateCatalogName service:', error);
     throw error;
