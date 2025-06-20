@@ -1,0 +1,1 @@
+export { DELETE } from '@/modules/documents/controllers/imageController';

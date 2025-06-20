@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect, ChangeEvent } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { RefreshCcw, Download, Upload } from "lucide-react"
+import { RefreshCcw, Download } from "lucide-react"
 import { fetchDashboardData } from "@/lib/data-service"
 import {
   ResponsiveContainer,
@@ -19,15 +19,6 @@ import {
   Pie,
   Cell,
 } from "recharts"
-
-interface Client {
-  name: string;
-  number: string;
-}
-
-interface PayloadFormat {
-  activate: Client[];
-}
 
 export default function DashboardCharts() {
   const [data, setData] = useState<any>(null)
@@ -62,67 +53,29 @@ export default function DashboardCharts() {
     }
   }
 
-  // Export CSV handler
   const handleDownloadCSV = () => {
-    if (!data || data.length === 0) {
-      alert("Nenhum dado disponível para exportar.");
-      return;
-    }
-    const whatsappData = data[0];
+    if (!data) return
+
+    const headers = ["Métrica", "Valor"]
     const csvRows = [
-      ["Métrica", "Valor"],
-      ["Sucessos", whatsappData.sucessos],
-      ["Falhas", whatsappData.falhas],
-      ["Respostas", whatsappData.respostas],
-      ["Total de Mensagens", whatsappData.sucessos + whatsappData.falhas]
-    ];
-    const csvContent = csvRows.map(row => row.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
+      headers.join(","),
+      ["Sucessos", data[0].sucessos].join(","),
+      ["Falhas", data[0].falhas].join(","),
+      ["Respostas", data[0].respostas].join(","),
+    ]
 
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "whatsapp-metricas.csv";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const csvContent = csvRows.join("\n")
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+
+    const link = document.createElement("a")
+    link.setAttribute("href", url)
+    link.setAttribute("download", "whatsapp-data.csv")
+    link.style.visibility = "hidden"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
-
-const handleUploadCSV = async (event: ChangeEvent<HTMLInputElement>) => {
-  const file = event.target.files?.[0];
-  if (!file) return;
-
-  // Check if it's a CSV file
-  if (!file.name.endsWith('.csv')) {
-    alert('Por favor, selecione um arquivo CSV válido.');
-    return;
-  }
-
-  try {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const response = await fetch('/api/upload', {
-      method: 'POST',
-      body: formData
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || 'Upload failed');
-    }
-
-    alert('Arquivo processado com sucesso!');
-    event.target.value = '';
-
-  } catch (error) {
-    console.error('Upload error:', error);
-    alert(error instanceof Error ? error.message : 'Erro ao fazer upload do arquivo');
-  }
-};
-
 
   // Prepare data for pie chart
   const preparePieData = () => {
@@ -183,17 +136,6 @@ const handleUploadCSV = async (event: ChangeEvent<HTMLInputElement>) => {
             <Download className="h-4 w-4 mr-2" />
             Exportar CSV
           </Button>
-          <Button variant="outline" size="sm" onClick={() => document.getElementById('csvUpload')?.click()}>
-            <Upload className="h-4 w-4 mr-2" />
-            Importar CSV
-          </Button>
-          <input
-            id="csvUpload"
-            type="file"
-            accept=".csv"
-            className="hidden"
-            onChange={handleUploadCSV}
-          />
         </div>
       </div>
 

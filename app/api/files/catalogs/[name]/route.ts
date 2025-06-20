@@ -1,0 +1,1 @@
+export { PUT, DELETE } from '@/modules/documents/controllers/catalogController';

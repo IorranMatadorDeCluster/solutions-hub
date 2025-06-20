@@ -1,0 +1,1 @@
+export { PUT } from '@/modules/documents/controllers/imageController';

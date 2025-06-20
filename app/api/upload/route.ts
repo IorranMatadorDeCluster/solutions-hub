@@ -9,41 +9,51 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No file received" }, { status: 400 })
     }
 
-    // Read and process the CSV
+    if (file.type !== "text/csv") {
+      return NextResponse.json({ error: "File must be a CSV" }, { status: 400 })
+    }
+
+    // Read the file content
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
     const csvContent = buffer.toString("utf-8")
 
-    const lines = csvContent.split('\n')
-    const dataLines = lines.slice(1).filter(line => line.trim())
+    // Here you can process the CSV content or send it to another service
+    // For example, you could:
+    // 1. Parse the CSV data
+    // 2. Send it to an external API
+    // 3. Store it in a database
+    // 4. Process it with your business logic
 
-    // Create clients array
-    const clients = dataLines.map(line => {
-      const [name, number] = line.split(',').map(item => item.trim())
-      return {
-        name,
-        number: number.replace(/\D/g, '')
-      }
-    })
+    console.log("CSV file received:", file.name)
+    console.log("File size:", file.size, "bytes")
+    console.log("CSV content preview:", csvContent.substring(0, 200) + "...")
 
-    // Send to external service
-    const response = await fetch('https://primary-production-dd2e.up.railway.app/webhook/load', {
+    // Example: Send to external API (uncomment and modify as needed)
+    /*
+    const externalResponse = await fetch('https://your-api-endpoint.com/data', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ activate: clients })
+      body: JSON.stringify({
+        filename: file.name,
+        data: csvContent,
+        timestamp: new Date().toISOString(),
+      }),
     })
 
-    if (!response.ok) {
-      throw new Error('Failed to send data to external service')
+    if (!externalResponse.ok) {
+      throw new Error('Failed to send data to external API')
     }
+    */
 
     return NextResponse.json({
-      message: "File processed successfully",
-      filename: file.name
+      message: "File uploaded successfully",
+      filename: file.name,
+      size: file.size,
+      timestamp: new Date().toISOString(),
     })
-
   } catch (error) {
     console.error("Upload error:", error)
     return NextResponse.json({ error: "Failed to process file" }, { status: 500 })
